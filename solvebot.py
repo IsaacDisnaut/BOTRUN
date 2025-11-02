@@ -24,7 +24,7 @@ leftstep = 800
 rightstep = 800
 aroundstep = 800
 forwardstep = 800
-
+a=0
 # --- Current position tracking ---
 xx, yy = 0, 0  # current position
 prev_xx, prev_yy = 0, 0  # previous position
@@ -44,7 +44,10 @@ running = True
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code", rc)
     client.subscribe("step")
+
 latest_command=''
+latest_steps=0
+
 def on_message(client, userdata, msg):
     global latest_command, latest_steps
     payload = msg.payload.decode()
@@ -72,6 +75,7 @@ client.connect("test.mosquitto.org", 1883, 60)
 client.loop_start()
 
 while running:
+    print(f"Command = {latest_command}, Steps = {latest_steps}")
     # --- Read sensors ---``````
     sensor1 = sensor_raw1.distance*100  # left
     sensor2 = sensor_raw2.distance*100  # front
@@ -95,8 +99,12 @@ while running:
         aroundstep=latest_steps
         print(f"Now your around step is : {aroundstep}")
 
+    if latest_command == "phase":
+        phase=latest_steps
+        print(f"Now your phase is : {phase}")
+
     print(f"Left: {sensor1:.2f},Front: {sensor2:.2f},Right: {sensor3:.2f}")
-    if phase == 1:  # mapping phase
+    if phase == 1 and a == 0:  # mapping phase
         # เลี้ยวขวา
         print(phase)
         if sensor3 >= distancetowall:
@@ -173,6 +181,7 @@ while running:
             if facing == 90:
                 user_input = "left/" + str(leftstep)
                 ser.write((user_input + "\n").encode('utf-8'))
+                response = ""
                 while response == "":
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
@@ -180,6 +189,7 @@ while running:
             elif abs(facing) == 180:
                 user_input = "around/" + str(aroundstep)
                 ser.write((user_input + "\n").encode('utf-8'))
+                response = ""
                 while response == "":
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
@@ -187,10 +197,11 @@ while running:
             elif facing == -90 or facing == 270:
                 user_input = "right/" + str(rightstep)
                 ser.write((user_input + "\n").encode('utf-8'))
+                response = ""
                 while response == "":
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
-
+            a=1
             time.sleep(1)
             data = ser.readline().decode('utf-8', errors='ignore').strip()
             if data:
@@ -291,7 +302,7 @@ while running:
     if data:
         print(f"Received: {data},Left: {sensor1},Front: {sensor2},Right: {sensor3}")
     
-    latest_command=''
+    
 
 client.loop_stop()
 client.disconnect()
