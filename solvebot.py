@@ -215,6 +215,13 @@ while running:
             if msgfromros == 'left':
                 user_input = "left/" + str(leftstep)
                 ser.write((user_input + "\n").encode('utf-8'))
+                response =""
+                while response == "":
+                    response = ser.readline().decode('utf-8').strip()
+
+                user_input = "forward/" + str(forwardstep)
+                ser.write((user_input + "\n").encode('utf-8'))
+                response = ""
                 while response == "":
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
@@ -222,6 +229,13 @@ while running:
             elif msgfromros == 'right':
                 user_input = "right/" + str(rightstep)
                 ser.write((user_input + "\n").encode('utf-8'))
+                response=""
+                while response == "":
+                    response = ser.readline().decode('utf-8').strip()
+
+                user_input = "forward/" + str(forwardstep)
+                ser.write((user_input + "\n").encode('utf-8'))
+                response = ""
                 while response == "":
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
@@ -229,9 +243,12 @@ while running:
             elif msgfromros == 'forward':
                 user_input = "forward/" + str(forwardstep)
                 ser.write((user_input + "\n").encode('utf-8'))
+                response=""
                 while response == "":
                     response = ser.readline().decode('utf-8').strip()
+
                 time.sleep(0.5)
+       
         else:
             user_input = "forward/" + str(forwardstep)
             ser.write((user_input + "\n").encode('utf-8'))
@@ -259,10 +276,22 @@ while running:
                 response = ""
                 while response == "":
                     response = ser.readline().decode('utf-8').strip()
+
+                user_input = "forward/" + str(forwardstep)
+                ser.write((user_input + "\n").encode('utf-8'))
+                response = ""
+                while response == "":
+                    response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
 
             elif msgfromros == 'right':
                 user_input = "right/" + str(rightstep)
+                ser.write((user_input + "\n").encode('utf-8'))
+                response = ""
+                while response == "":
+                    response = ser.readline().decode('utf-8').strip()
+
+                user_input = "forward/" + str(forwardstep)
                 ser.write((user_input + "\n").encode('utf-8'))
                 response = ""
                 while response == "":
@@ -302,7 +331,5 @@ while running:
     if data:
         print(f"Received: {data},Left: {sensor1},Front: {sensor2},Right: {sensor3}")
     
-    
-
 client.loop_stop()
 client.disconnect()
