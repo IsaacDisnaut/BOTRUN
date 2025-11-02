@@ -6,6 +6,11 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from gpiozero import DistanceSensor
 from time import sleep
+import paho.mqtt.client as mqtt
+
+BROKER = "test.mosquitto.org"   # public test broker (no auth). Replace with your broker.
+PORT = 1883
+TOPIC = "step"
 
 try:
     ser = serial.Serial('/dev/ttyAMA0', baudrate=9600, timeout=0.5)
@@ -27,19 +32,68 @@ facing = 0
 ultra1 = 0
 ultra2 = 0
 distancetowall = 10
-phase = 1  # 1 = mapping, 2 = solved, 3 = return
+phase = 0  # 1 = mapping, 2 = solved, 3 = return
 msgtoros = ''
 msgfromros = ''
-sensor_raw1 = DistanceSensor(echo=24, trigger=23)  # left
-sensor_raw2 = DistanceSensor(echo=27, trigger=17)  # front
+sensor_raw1 = DistanceSensor(echo=27, trigger=17)  # left
+sensor_raw2 = DistanceSensor(echo=24, trigger=23)  # front
 sensor_raw3 = DistanceSensor(echo=6, trigger=5)    # right
 # --- Main Loop ---
 running = True
+
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code", rc)
+    client.subscribe("step")
+latest_command=''
+def on_message(client, userdata, msg):
+    global latest_command, latest_steps
+    payload = msg.payload.decode()
+    print(f"Received: {payload}")
+
+    # ✅ Split "command/number" format
+    if "/" in payload:
+        command, steps_str = payload.split("/", 1)  # split only at first "/"
+        latest_command = command
+        try:
+            latest_steps = int(steps_str)
+        except ValueError:
+            print(f"Invalid number: {steps_str}")
+            latest_steps = None
+    else:
+        print("Invalid format, expected command/number")
+
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+client.connect("test.mosquitto.org", 1883, 60)
+
+# ✅ Start MQTT network loop in background
+client.loop_start()
+
 while running:
-    # --- Read sensors ---
+    # --- Read sensors ---``````
     sensor1 = sensor_raw1.distance*100  # left
     sensor2 = sensor_raw2.distance*100  # front
     sensor3 = 0  # right
+    print(phase)
+    if latest_command == "start" and latest_steps == 1:
+        phase = 1
+    if latest_command == "left":
+        leftstep=latest_steps
+        print(f"Now your left step is : {leftstep}")
+
+    if latest_command == "right":
+        rightstep=latest_steps
+        print(f"Now your right step is : {rightstep}")
+
+    if latest_command == "forward":
+        forwardstep=latest_steps
+        print(f"Now your forward step is : {forwardstep}")
+
+    if latest_command == "around":
+        aroundstep=latest_steps
+        print(f"Now your around step is : {aroundstep}")
 
     print(f"Left: {sensor1:.2f},Front: {sensor2:.2f},Right: {sensor3:.2f}")
     if phase == 1:  # mapping phase
@@ -236,3 +290,8 @@ while running:
 
     if data:
         print(f"Received: {data},Left: {sensor1},Front: {sensor2},Right: {sensor3}")
+    
+    latest_command=''
+
+client.loop_stop()
+client.disconnect()
