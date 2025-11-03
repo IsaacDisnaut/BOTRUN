@@ -138,12 +138,13 @@ while running:
                 response = ser.readline().decode('utf-8').strip()
             facing = facing + 90
             time.sleep(0.5)
+            client.publish("state","r")#right
 
         # กลับรถ
         elif sensor1 <= distancetowall and sensor2 <= distancetowall and sensor3 <= distancetowall:
             user_input = "around/" + str(aroundstep)
             ser.write((user_input + "\n").encode('utf-8'))
-            print("around")
+            print("b")
 
             response = ""
             while response == "":
@@ -157,6 +158,7 @@ while running:
                 response = ser.readline().decode('utf-8').strip()
             facing = facing + 180
             time.sleep(0.5)
+            client.publish("state","b")#turn around
 
         # ตรงไป
         elif sensor2 >= distancetowall and sensor3 <= distancetowall:
@@ -168,6 +170,7 @@ while running:
             while response == "":
                 response = ser.readline().decode('utf-8').strip()
             time.sleep(0.5)
+            client.publish("state","s")#Forward
 
         # เลี้ยวซ้าย
         elif sensor1 >= distancetowall:
@@ -187,11 +190,10 @@ while running:
                 response = ser.readline().decode('utf-8').strip()
             facing = facing - 90
             time.sleep(0.5)
+            client.publish("state","l") #turn left
 
 
-
-
-        if msgtoros == 'end':
+        if msgfromros == 'end':
             if facing == 90:
                 user_input = "left/" + str(leftstep)
                 ser.write((user_input + "\n").encode('utf-8'))
@@ -216,16 +218,18 @@ while running:
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
             a=1
+            client.publish("state","stop")
+            client.publish("state","solve")
             time.sleep(1)
-            data = ser.readline().decode('utf-8', errors='ignore').strip()
-            if data:
-                if msgfromros == "round2":
-                    phase = 2
+            phase = 2
+
+                    
 
     elif phase == 2:  # solved phase
         if sensor1 >= distancetowall or sensor3 >= distancetowall:
-            msgtoros = 'ask'
-
+            client.publish("state","ask")
+            print("asked")
+            time.sleep(2)
             if msgfromros == 'left':
                 user_input = "left/" + str(leftstep)
                 ser.write((user_input + "\n").encode('utf-8'))
@@ -282,7 +286,9 @@ while running:
 
     elif phase == 3:  # return phase
         if sensor1 >= distancetowall or sensor3 >= distancetowall:
-            msgtoros = 'ask2'
+            client.publish("state","ask2")
+            print("asked2")
+            time.sleep(2)
 
             if msgfromros == 'left':
                 user_input = "left/" + str(leftstep)
