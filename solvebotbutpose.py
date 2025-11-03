@@ -1,79 +1,134 @@
+
 import serial
 import time
 import sys
+import threading
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from gpiozero import DistanceSensor
-from time import sleep
 import paho.mqtt.client as mqtt
 
-BROKER = "test.mosquitto.org"   # public test broker (no auth). Replace with your broker.
-PORT = 1883
-TOPIC = "step"
-
+# -----------------------------
+# Serial setup
+# -----------------------------
 try:
     ser = serial.Serial('/dev/ttyAMA0', baudrate=9600, timeout=0.5)
-    time.sleep(2)  # Give time for UART to initialize
+    time.sleep(2)  # UART initialize
     print("✅ Serial port open on /dev/ttyAMA0 (9600 baud)")
 except Exception as e:
     print(f"❌ Failed to open serial port: {e}")
     sys.exit(1)
 
+# -----------------------------
+# Steps & state variables
+# -----------------------------
 leftstep = 800
 rightstep = 800
 aroundstep = 800
 forwardstep = 800
-a=0
-# --- Current position tracking ---
-xx, yy = 0, 0  # current position
-prev_xx, prev_yy = 0, 0  # previous position
+
+xx, yy = 0, 0
+prev_xx, prev_yy = 0, 0
 facing = 0
-ultra1 = 0
-ultra2 = 0
-distancetowall = 10
-phase = 0  # 1 = mapping, 2 = solved, 3 = return
-msgtoros = ''
+phase = 0
+a = 0
 msgfromros = ''
+
+latest_command = ''
+latest_steps = 0
+latest_dir = ''
+
+distancetowall = 10
+
+# -----------------------------
+# GPIO Sensors
+# -----------------------------
 sensor_raw1 = DistanceSensor(echo=27, trigger=17)  # left
 sensor_raw2 = DistanceSensor(echo=24, trigger=23)  # front
 sensor_raw3 = DistanceSensor(echo=6, trigger=5)    # right
-# --- Main Loop ---
-running = True
+
+# -----------------------------
+# MQTT setup
+# -----------------------------
+BROKER = "test.mosquitto.org"
+PORT = 1883
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code", rc)
+    print("✅ MQTT Connected with result code", rc)
     client.subscribe("step")
-
-latest_command=''
-latest_steps=0
+    client.subscribe("dir")
+    print("📡 Subscribed to topics: step, dir")
 
 def on_message(client, userdata, msg):
-    global latest_command, latest_steps
-    payload = msg.payload.decode()
-    print(f"Received: {payload}")
+    global latest_command, latest_steps, latest_dir
+    payload = msg.payload.decode().strip()
+    topic = msg.topic
+    print(f"📩 Received on '{topic}': {payload}")
 
-    # ✅ Split "command/number" format
-    if "/" in payload:
-        command, steps_str = payload.split("/", 1)  # split only at first "/"
-        latest_command = command
-        try:
-            latest_steps = int(steps_str)
-        except ValueError:
-            print(f"Invalid number: {steps_str}")
-            latest_steps = None
-    else:
-        print("Invalid format, expected command/number")
-
+    if topic == "step":
+        if "/" in payload:
+            command, steps_str = payload.split("/", 1)
+            latest_command = command.strip()
+            try:
+                latest_steps = int(steps_str)
+            except ValueError:
+                print(f"❌ Invalid number: {steps_str}")
+                latest_steps = None
+        else:
+            print("⚠️ Invalid format on step topic — expected command/number")
+    elif topic == "dir":
+        latest_dir = payload.strip()
 
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
-client.connect("test.mosquitto.org", 1883, 60)
-
-# ✅ Start MQTT network loop in background
+client.connect(BROKER, PORT, 60)
 client.loop_start()
 
+# -----------------------------
+# ROS2 Subscriber
+# -----------------------------
+xx, yy = 0, 0  # current grid position
+
+# Import your actual message type
+# from your_msgs.msg import POSE_2D
+from geometry_msgs.msg import Pose2D as POSE_2D  # example substitute
+
+class GridSubscriber(Node):
+    def __init__(self):
+        super().__init__('grid_subscriber')
+        self.subscription = self.create_subscription(
+            POSE_2D,
+            'grid_location',
+            self.listener_callback,
+            10
+        )
+        self.subscription
+
+    def listener_callback(self, msg):
+        global xx, yy
+        xx = msg.x
+        yy = msg.y
+        self.get_logger().info(f"🔹 Received grid_location: x={xx}, y={yy}")
+
+def ros2_thread():
+    rclpy.init()
+    node = GridSubscriber()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+t_ros = threading.Thread(target=ros2_thread)
+t_ros.start()
+
+# -----------------------------
+# Forward mapping helper
+# -----------------------------
 def forwardmap(xx,yy,prev_xx,prev_yy):
     user_input = "forwardmap/" + str(forwardstep)
     ser.write((user_input + "\n").encode('utf-8'))
@@ -81,13 +136,14 @@ def forwardmap(xx,yy,prev_xx,prev_yy):
     while response != "forwardmap":
         #xx= 
         #yy=
+        print(f"x= {xx} y= {yy}")
         if xx != prev_xx or yy != prev_yy:
             user_input = "stop/" + str(0)
             ser.write((user_input + "\n").encode('utf-8'))
         response = ser.readline().decode('utf-8').strip()
         prev_xx = xx
         prev_yy=yy
-
+running=True
 while running:
     print(f"Command = {latest_command}, Steps = {latest_steps}")
     # --- Read sensors ---``````
@@ -227,10 +283,11 @@ while running:
 
     elif phase == 2:  # solved phase
         if sensor1 >= distancetowall or sensor3 >= distancetowall:
+            latest_dir='' 
             client.publish("state","ask")
             print("asked")
             time.sleep(2)
-            if msgfromros == 'left':
+            if latest_dir == 'left':
                 user_input = "left/" + str(leftstep)
                 ser.write((user_input + "\n").encode('utf-8'))
                 response =""
@@ -244,7 +301,7 @@ while running:
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
 
-            elif msgfromros == 'right':
+            elif latest_dir == 'right':
                 user_input = "right/" + str(rightstep)
                 ser.write((user_input + "\n").encode('utf-8'))
                 response=""
@@ -258,7 +315,7 @@ while running:
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
 
-            elif msgfromros == 'forward':
+            elif latest_dir == 'forward':
                 user_input = "forward/" + str(forwardstep)
                 ser.write((user_input + "\n").encode('utf-8'))
                 response=""
@@ -290,7 +347,7 @@ while running:
             print("asked2")
             time.sleep(2)
 
-            if msgfromros == 'left':
+            if latest_dir == 'left':
                 user_input = "left/" + str(leftstep)
                 ser.write((user_input + "\n").encode('utf-8'))
                 response = ""
@@ -304,7 +361,7 @@ while running:
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
 
-            elif msgfromros == 'right':
+            elif latest_dir == 'right':
                 user_input = "right/" + str(rightstep)
                 ser.write((user_input + "\n").encode('utf-8'))
                 response = ""
@@ -318,7 +375,7 @@ while running:
                     response = ser.readline().decode('utf-8').strip()
                 time.sleep(0.5)
 
-            elif msgfromros == 'forward':
+            elif latest_dir == 'forward':
                 user_input = "forward/" + str(forwardstep)
                 ser.write((user_input + "\n").encode('utf-8'))
                 response = ""
@@ -353,3 +410,4 @@ while running:
     
 client.loop_stop()
 client.disconnect()
+
