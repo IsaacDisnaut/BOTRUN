@@ -25,7 +25,7 @@ sensor2=0
 sensor3=0
 
 xx, yy = 0, 0
-prev_xx, prev_yy = 0, 0
+prev_xx, prev_yy = xx, yy
 tarx,tary=0,0
 facing = 0
 phase = 0
@@ -130,10 +130,18 @@ def forwardmap(xx,yy,prev_xx,prev_yy):
         response = ser.readline().decode('utf-8').strip()
         prev_xx = xx
         prev_yy=yy
-
 facingdum = ''
 go = ''
 
+def forward():
+    user_input = "forward/" + str(forwardstep)
+    ser.write((user_input + "\n").encode('utf-8'))
+    print("forward")
+    response = ""
+    while response == "":
+        response = ser.readline().decode('utf-8').strip()
+    time.sleep(0.5)
+    
 def turn_left():
     user_input = "left/" + str(leftstep)
     ser.write((user_input + "\n").encode('utf-8'))
@@ -143,13 +151,8 @@ def turn_left():
     while response == "":
         response = ser.readline().decode('utf-8').strip()
         time.sleep(0.5)
-
-        user_input = "forward/" + str(forwardstep)
-        ser.write((user_input + "\n").encode('utf-8'))
-        response = ""
-        while response == "":
-            response = ser.readline().decode('utf-8').strip()
-        facing = (facing - 90)%360
+    forwardmap()
+    facing = (facing - 90)%360
 
 def turn_right():
     user_input = "right/" + str(leftstep)
@@ -161,12 +164,8 @@ def turn_right():
         response = ser.readline().decode('utf-8').strip()
         time.sleep(0.5)
 
-        user_input = "forward/" + str(forwardstep)
-        ser.write((user_input + "\n").encode('utf-8'))
-        response = ""
-        while response == "":
-            response = ser.readline().decode('utf-8').strip()
-        facing = (facing + 90)%360
+    forwardmap()
+    facing = (facing + 90)%360
 
 def turn_Around():
     user_input = "around/" + str(aroundstep)
@@ -178,21 +177,8 @@ def turn_Around():
         response = ser.readline().decode('utf-8').strip()
         time.sleep(0.5)
 
-    user_input = "forward/" + str(forwardstep)
-    ser.write((user_input + "\n").encode('utf-8'))
-    response = ""
-    while response == "":
-        response = ser.readline().decode('utf-8').strip()
+    forwardmap()
     facing = (facing + 180)%360
-    time.sleep(0.5)
-
-def forward():
-    user_input = "forward/" + str(forwardstep)
-    ser.write((user_input + "\n").encode('utf-8'))
-    print("forward")
-    response = ""
-    while response == "":
-        response = ser.readline().decode('utf-8').strip()
     time.sleep(0.5)
 
 def check_exit():
@@ -209,7 +195,7 @@ def check_exit():
             if sensor3 >= distancetowall:
                 turn_right()
             elif sensor2 >= distancetowall:
-                forward()
+                forwardmap()
         if facing == -90 or facing ==270: #forward
             if sensor2 >= distancetowall:
                 state=f"final/{xx}/{yy}/{facing}"
@@ -235,7 +221,7 @@ def check_exit():
                 go = "right"
                 print(state,xx,yy,facing)
             if sensor2 >= distancetowall:
-                forward()
+                forwardmap()
             elif sensor1 >= distancetowall:
                 turn_left()
 
@@ -265,7 +251,7 @@ def check_exit():
             if sensor3 >= distancetowall:
                 turn_right()
             elif sensor2 >= distancetowall:
-                forward()
+                forwardmap()
         if facing == 90 or facing == -270: #forward
             if sensor2 >= distancetowall:
                 state=f"final/{xx}/{yy}/{facing}"
@@ -291,7 +277,7 @@ def check_exit():
                 go="right"
                 print(state,xx,yy,facing)
             if sensor2 >= distancetowall:
-                forward()
+                forwardmap()
             if sensor1 >= distancetowall:
                 turn_left()
 
@@ -320,7 +306,7 @@ def check_exit():
             if sensor3 >= distancetowall:
                 turn_right()
             if sensor2 >= distancetowall:
-                forward()
+                forwardmap()
     elif xx == 9:
         if facing == 0:
             if sensor2 >= distancetowall:
@@ -348,7 +334,7 @@ def check_exit():
             if sensor3 >= distancetowall:
                 turn_right()
             if sensor2 >= distancetowall:
-                forward()
+                forwardmap()
         if facing == -90 or facing == 270:
             if sensor3 >= distancetowall:
                 state=f"final/{xx}/{yy}/{facing}"
@@ -359,7 +345,7 @@ def check_exit():
                 go = "right"
                 print(state,xx,yy,facing)
             if sensor2 >= distancetowall:
-                forward()
+                forwardmap()
             if sensor1 >= distancetowall:
                 turn_left()
     
@@ -414,7 +400,7 @@ while running:
 
         # ตรงไป
         elif sensor2 >= distancetowall and sensor3 <= distancetowall:
-            forward()
+            forwardmap()
             client.publish("state","s")#Forward
 
         # เลี้ยวซ้าย
@@ -465,7 +451,7 @@ while running:
                 turn_right()
 
             elif latest_dir == 'forward':
-                forward()
+                forwardmap()
        
         else:
             user_input = "forward/" + str(forwardstep)
@@ -481,7 +467,7 @@ while running:
                 if go == "right":
                     turn_right()
                 if go == "forward":
-                    forward()
+                    forwardmap()
             else:
                 while facing != facingdum:
                     user_input = "right/" + str(leftstep)
@@ -498,9 +484,16 @@ while running:
                    turn_right()
 
                 if go == "forward":
-                    forward()
+                    forwardmap()
 
     data = ser.readline().decode('utf-8', errors='ignore').strip()
+
+    if data:
+        print(f"Received: {data},Left: {sensor1},Front: {sensor2},Right: {sensor3}")
+
+client.loop_stop()
+client.disconnect()
+
 
     if data:
         print(f"Received: {data},Left: {sensor1},Front: {sensor2},Right: {sensor3}")
