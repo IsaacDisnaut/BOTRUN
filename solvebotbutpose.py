@@ -192,7 +192,7 @@ def turn_left():
     print("left")
 
     response = ""
-    while response == "":
+    while response != "left":
         response = ser.readline().decode('utf-8').strip()
         sensor2dummy = sensor_raw2.distance*100
         if sensor2dummy < distancetowall:
@@ -215,7 +215,7 @@ def turn_right():
     ser.write((user_input + "\n").encode('utf-8'))
     print("right")  
     response = ""
-    while response == "":
+    while response != "right":
         response = ser.readline().decode('utf-8').strip()
         sensor2dummy = sensor_raw2.distance*100
         if sensor2dummy < distancetowall:
@@ -240,7 +240,7 @@ def turn_Around():
     print("b")
 
     response = ""
-    while response == "":
+    while response != "around":
         response = ser.readline().decode('utf-8').strip()
         sensor2dummy = sensor_raw2.distance*100
         if sensor2dummy < distancetowall:
