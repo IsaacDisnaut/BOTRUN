@@ -9,7 +9,7 @@ from gpiozero import DistanceSensor
 import paho.mqtt.client as mqtt
 
 try:
-    ser = serial.Serial('/dev/ttyAMA0', baudrate=115200, timeout=0.5)
+    ser = serial.Serial('/dev/ttyAMA0', baudrate=9600, timeout=0.5)
     time.sleep(2)  # UART initialize
     print("✅ Serial port open on /dev/ttyAMA0 (9600 baud)")
 except Exception as e:
@@ -24,11 +24,11 @@ sensor1=0
 sensor2=0
 sensor3=0
 
-xx, yy = 0, 0
+xx, yy = 2, 3
 prev_xx, prev_yy = xx, yy
 tarx,tary=0,0
 facing = 0
-phase = 1
+phase = 0
 a = 0
 msgfromros = ''
 
@@ -41,9 +41,9 @@ distancetowall = 12
 sensor_raw1 = DistanceSensor(echo=27, trigger=17)  # left
 sensor_raw2 = DistanceSensor(echo=24, trigger=23)  # front
 sensor_raw3 = DistanceSensor(echo=6, trigger=5)    # right
-sensor1 = None # left
-sensor2 = None   # front
-sensor3 = None   # right
+sensor1 = 0 # left
+sensor2 = 0   # front
+sensor3 = 0   # right
 
 BROKER = "test.mosquitto.org"
 PORT = 1883
@@ -138,20 +138,30 @@ xx, yy = 0, 0  # current grid position
 
 def forwardmap():
     global prev_xx,prev_yy,xx,yy
+    sensor2dummy=''
     print("forwarding")
     user_input = "forwardmap/" + str(forwardstep)
     ser.write((user_input + "\n").encode('utf-8'))
     response = ""
     while response != "forwardmap":
-        if sensor2 <= distancetowall:
+        sensor2dummy = sensor_raw2.distance*100  # front
+
+        print(f"wall {sensor2dummy} ")
+        if sensor2dummy < distancetowall:
+            user_input = "stop/" 
+            ser.write((user_input + "\n").encode('utf-8'))
             break
         print(f"x= {xx} y= {yy} prev_xx={prev_xx} prev_yy={prev_yy}")
         if xx != prev_xx or yy != prev_yy:
-            user_input = "stop/" + str(0)
+            user_input = "stop/" 
             ser.write((user_input + "\n").encode('utf-8'))
         response = ser.readline().decode('utf-8').strip()
     print("forward")
-    time.sleep(2)
+    sensor1 = sensor_raw1.distance*100  # left
+    sensor2 = sensor_raw2.distance*100  # front
+    sensor3 = sensor_raw3.distance*100  # right
+    print(f"Left: {sensor1},Front: {sensor2},Right: {sensor3}")
+    time.sleep(1)
 facingdum = ''
 go = ''
 fin=""
@@ -163,7 +173,7 @@ def forward():
     response = ""
     while response == "":
         response = ser.readline().decode('utf-8').strip()
-    time.sleep(0.5)
+    
     
 def turn_left():
     global facing
@@ -174,23 +184,33 @@ def turn_left():
     response = ""
     while response == "":
         response = ser.readline().decode('utf-8').strip()
-        time.sleep(0.5)
+    time.sleep(1)
     forwardmap()
     facing = (facing - 90)%360
+    sensor1 = sensor_raw1.distance*100  # left
+    sensor2 = sensor_raw2.distance*100  # front
+    sensor3 = sensor_raw3.distance*100  # right
+    print(f"Left: {sensor1},Front: {sensor2},Right: {sensor3}")
+    time.sleep(1)
 
 def turn_right():
+    
     global facing
     user_input = "right/" + str(leftstep)
     ser.write((user_input + "\n").encode('utf-8'))
-    print("right")
-
+    print("right")  
     response = ""
     while response == "":
         response = ser.readline().decode('utf-8').strip()
-        time.sleep(0.5)
-
+    time.sleep(1)
     forwardmap()
     facing = (facing + 90)%360
+    sensor1 = sensor_raw1.distance*100  # left
+    sensor2 = sensor_raw2.distance*100  # front
+    sensor3 = sensor_raw3.distance*100  # right
+    print(f"Left: {sensor1},Front: {sensor2},Right: {sensor3}")
+    print("righted") 
+    time.sleep(1)
 
 def turn_Around():
     global facing
@@ -201,11 +221,15 @@ def turn_Around():
     response = ""
     while response == "":
         response = ser.readline().decode('utf-8').strip()
-        time.sleep(0.5)
-
+    
+    time.sleep(1)
     forwardmap()
     facing = (facing + 180)%360
-    time.sleep(0.5)
+    sensor1 = sensor_raw1.distance*100  # left
+    sensor2 = sensor_raw2.distance*100  # front
+    sensor3 = sensor_raw3.distance*100  # right
+    print(f"Left: {sensor1},Front: {sensor2},Right: {sensor3}")
+    time.sleep(1)
 
 def check_exit():
     if yy ==0:
@@ -578,17 +602,6 @@ while running:
                 if go == "forward":
                     forwardmap()
 
-    
-
-    prev_xx = xx
-    prev_yy=yy
-    if data:
-        print(f"Received: {data},Left: {sensor1},Front: {sensor2},Right: {sensor3}")
-    sensor1=0
-    sensor2=0
-    sensor3=0
-client.loop_stop()
-client.disconnect()
     
 
     prev_xx = xx
