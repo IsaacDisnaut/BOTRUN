@@ -9,7 +9,7 @@ from gpiozero import DistanceSensor
 import paho.mqtt.client as mqtt
 
 try:
-    ser = serial.Serial('/dev/ttyAMA0', baudrate=9600, timeout=0.5)
+    ser = serial.Serial('/dev/ttyAMA0', baudrate=115200, timeout=0.5)
     time.sleep(2)  # UART initialize
     print("✅ Serial port open on /dev/ttyAMA0 (9600 baud)")
 except Exception as e:
@@ -143,7 +143,8 @@ def forwardmap():
     ser.write((user_input + "\n").encode('utf-8'))
     response = ""
     while response != "forwardmap":
-
+        if sensor2 <= distancetowall:
+            break
         print(f"x= {xx} y= {yy} prev_xx={prev_xx} prev_yy={prev_yy}")
         if xx != prev_xx or yy != prev_yy:
             user_input = "stop/" + str(0)
@@ -447,6 +448,7 @@ while running:
     sensor1 = sensor_raw1.distance*100  # left
     sensor2 = sensor_raw2.distance*100  # front
     sensor3 = sensor_raw3.distance*100  # right
+    print(f"Left: {sensor1},Front: {sensor2},Right: {sensor3}")
     data = ser.readline().decode('utf-8', errors='ignore').strip()
     print(phase)
     print(f"Left: {sensor1:.2f},Front: {sensor2:.2f},Right: {sensor3:.2f}")
@@ -576,6 +578,17 @@ while running:
                 if go == "forward":
                     forwardmap()
 
+    
+
+    prev_xx = xx
+    prev_yy=yy
+    if data:
+        print(f"Received: {data},Left: {sensor1},Front: {sensor2},Right: {sensor3}")
+    sensor1=0
+    sensor2=0
+    sensor3=0
+client.loop_stop()
+client.disconnect()
     
 
     prev_xx = xx
