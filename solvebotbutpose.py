@@ -194,6 +194,10 @@ def turn_left():
     response = ""
     while response == "":
         response = ser.readline().decode('utf-8').strip()
+        sensor2dummy = sensor_raw2.distance*100
+        if sensor2dummy < distancetowall:
+            user_input = "stop/" 
+            ser.write((user_input + "\n").encode('utf-8'))
     time.sleep(1)
     forwardmap()
     facing = (facing - 90)%360
@@ -213,6 +217,11 @@ def turn_right():
     response = ""
     while response == "":
         response = ser.readline().decode('utf-8').strip()
+        sensor2dummy = sensor_raw2.distance*100
+        if sensor2dummy < distancetowall:
+            user_input = "stop/" 
+            ser.write((user_input + "\n").encode('utf-8'))
+
     time.sleep(1)
     forwardmap()
     facing = (facing + 90)%360
@@ -233,7 +242,10 @@ def turn_Around():
     response = ""
     while response == "":
         response = ser.readline().decode('utf-8').strip()
-    
+        sensor2dummy = sensor_raw2.distance*100
+        if sensor2dummy < distancetowall:
+            user_input = "stop/" 
+            ser.write((user_input + "\n").encode('utf-8'))
     time.sleep(1)
     forwardmap()
     facing = (facing + 180)%360
