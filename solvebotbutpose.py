@@ -135,12 +135,20 @@ xx, yy = 0, 0  # current grid position
 
 # t_ros = threading.Thread(target=ros2_thread)
 # t_ros.start()
+def wait_for_ready():
+    while True:
+        ser.write(("status\n").encode())
+        response = ser.readline().decode('utf-8').strip()
+        if response == "ready":
+            break
+        time.sleep(0.1)
 
 def forwardmap():
     global prev_xx,prev_yy,xx,yy
     sensor2dummy=''
     print("forwarding")
     user_input = "forwardmap/" + str(forwardstep)
+    wait_for_ready()
     ser.write((user_input + "\n").encode('utf-8'))
     response = ""
     while response != "forwardmap":
@@ -168,6 +176,7 @@ fin=""
 
 def forward():
     user_input = "forward/" + str(forwardstep)
+    wait_for_ready()
     ser.write((user_input + "\n").encode('utf-8'))
     print("forward")
     response = ""
@@ -178,6 +187,7 @@ def forward():
 def turn_left():
     global facing
     user_input = "left/" + str(leftstep)
+    wait_for_ready()
     ser.write((user_input + "\n").encode('utf-8'))
     print("left")
 
@@ -197,6 +207,7 @@ def turn_right():
     
     global facing
     user_input = "right/" + str(leftstep)
+    wait_for_ready()
     ser.write((user_input + "\n").encode('utf-8'))
     print("right")  
     response = ""
@@ -215,6 +226,7 @@ def turn_right():
 def turn_Around():
     global facing
     user_input = "around/" + str(aroundstep)
+    wait_for_ready()
     ser.write((user_input + "\n").encode('utf-8'))
     print("b")
 
@@ -601,9 +613,6 @@ while running:
 
                 if go == "forward":
                     forwardmap()
-
-    
-
     prev_xx = xx
     prev_yy=yy
     if data:
