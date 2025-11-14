@@ -1,10 +1,7 @@
 import serial
 import time
 import sys
-import threading
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String
+
 from gpiozero import DistanceSensor
 import paho.mqtt.client as mqtt
 import json
@@ -31,12 +28,13 @@ tarx,tary=0,0
 facing = 0
 phase = 1
 a = 0
-msgfromros = ''
+complete = ''
 
 latest_command = ''
 latest_steps = 0
 latest_dir = ''
 state=''
+stat=''
 distancetowall = 12
 
 BROKER = "broker.hivemq.com"
@@ -46,17 +44,18 @@ def on_connect(client, userdata, flags, rc):
     print("✅ MQTT Connected with result code", rc)
     client.subscribe("robot/tracking_data")
     client.subscribe("dir")
+    client.subscribe("robot/visited_stats")
     print("📡 Subscribed to topics: step, dir")
 
 def on_message(client, userdata, msg):
-    global latest_command, latest_steps, latest_dir, xx, yy, state
+    global latest_command, latest_steps, latest_dir, xx, yy, state,complete
     payload = msg.payload.decode().strip()
     topic = msg.topic
     #print(f"📩 Received on '{topic}': {payload}")
 
     if topic == "robot/tracking_data":
         # Split by commas first -> ["state/0", "xx/2", "yy/3"]
-        # print(payload)
+
         datas=json.loads(payload)
         xx=datas["grid_x"]
         yy=datas["grid_y"]
@@ -70,6 +69,10 @@ def on_message(client, userdata, msg):
     elif topic == "dir":
         latest_dir = payload.strip()
 
+    elif topic == "robot/visited_stats":
+        stat=json.loads(payload)
+
+        complete=stat["complete"]
 
 
 client = mqtt.Client()
@@ -78,45 +81,10 @@ client.on_message = on_message
 client.connect(BROKER, PORT, 60)
 client.loop_start()
 
-
-
-# from geometry_msgs.msg import Pose2D as POSE_2D  # example substitute
-
-# class GridSubscriber(Node):
-#     def __init__(self):
-#         super().__init__('grid_subscriber')
-#         self.subscription = self.create_subscription(
-#             POSE_2D,
-#             'grid_location',
-#             self.listener_callback,
-#             10
-#         )
-#         self.subscription
-
-#     def listener_callback(self, msg):
-#         global xx, yy
-#         xx = msg.x
-#         yy = msg.y
-#         self.get_logger().info(f"🔹ROS Received grid_location: x={xx}, y={yy}")
-
-# def ros2_thread():
-#     rclpy.init()
-#     node = GridSubscriber()
-#     try:
-#         rclpy.spin(node)
-#     except KeyboardInterrupt:
-#         pass
-#     finally:
-#         node.destroy_node()
-#         rclpy.shutdown()
-
-# t_ros = threading.Thread(target=ros2_thread)
-# t_ros.start()
-    
 running=True
 while running:
-    print(f"Grid :[{xx},{yy}] , prev:[{prev_xx},{prev_yy}], state: {state}]")
- 
+    print(f"Grid :[{xx},{yy}] , prev:[{prev_xx},{prev_yy}], state: {state}], complete:{complete}")
+
     print(phase)
     if latest_dir == "start" :
         phase = 1
@@ -127,8 +95,6 @@ while running:
     if phase == 0:
         yaw=ser.readline().decode('utf-8').strip()
         print("yaw=",yaw)
-
-
 
     if phase ==1 :  # mapping phase
         # เลี้ยวขวา
@@ -152,6 +118,15 @@ while running:
         elif response == "left":
             print(response)
             client.publish("state","l") #turn left
+        elif response == "final":
+            print(response)
+            client.publish("state","stop") #turn left
+            tarx=xx
+            tary=yy
+        if complete == "True":
+            print(complete)
+            client.publish("state","solve")
+        
     if phase ==2:
         response = ser.readline().decode('utf-8').strip()
         if response == "ask":
@@ -169,6 +144,10 @@ while running:
             elif latest_dir =="forward":
                 print("it' s forward")
                 user_input = "forward" + str(0)
+                ser.write((user_input + "\n").encode('utf-8'))
+        if tarx==xx and tary ==yy:
+                print("it' s reached")
+                user_input = "reach"
                 ser.write((user_input + "\n").encode('utf-8'))
 
     prev_xx = xx
