@@ -61,9 +61,17 @@ def on_message(client, userdata, msg):
         yy=datas["grid_y"]
         state = datas["state"]
         if xx != prev_xx or yy != prev_yy:
-            print("stop")
-            user_input = "stop"
-            ser.write((user_input + "\n").encode('utf-8'))
+            a=1
+        wait = " "
+        wait = ser.readline().decode('utf-8').strip()
+        if wait =="stop":
+            a=0
+        if a=1:
+            if state == "CHECK" or "STOP":
+                print("stop")
+                user_input = "stop"
+                ser.write((user_input + "\n").encode('utf-8'))
+                a=0
 
 
     elif topic == "dir":
